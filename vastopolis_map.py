@@ -160,13 +160,4 @@ def make_test_data():
 
 
 if __name__ == "__main__":
-    # x = np.random.randint(0, XMAX, (10))
-    # y = np.random.randint(0, YMAX, (10))
-    # var1 = np.random.randint(50, 100, (10))
-    # var2 = np.random.randint(50, 100, (10))
-    # data = pd.DataFrame(data=zip(x, y, var1, var2),
-    #                     columns=["x", "y", "var1", "var2"])
-    # data=load_data()
-
-    # render_map(data)
-    render_map(make_test_data())
+    render_map(load_data())
