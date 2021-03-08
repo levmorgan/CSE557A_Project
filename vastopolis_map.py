@@ -43,7 +43,7 @@ def render_map(data):
             layer="below")
     )
 
-    menu = make_menu(data_cols, dates, data)
+    menu, annotations = make_menu(data_cols, dates, data)
 
     # Set templates
     fig.update_layout(template="plotly_white")
@@ -54,12 +54,7 @@ def render_map(data):
     )
 
     fig.update_layout(
-        annotations=[
-            dict(text="Date: ", x=0, xref="paper", y=1.07, yref="paper",
-                 align="left", showarrow=False),
-            dict(text="Metric: ", x=0.27, xref="paper", y=1.07, yref="paper",
-                      align="left", showarrow=False)
-        ]
+        annotations=annotations
     )
     fig.show()
 
@@ -69,7 +64,7 @@ def make_menu(data_cols, dates, data):
     col_button_sets = []
 
     for date in dates:
-        date_data = data[data["date"] == dates[0]]
+        date_data = data[data["date"] == date]
         column_buttons = []
         for col in data_cols:
             button = dict(
@@ -88,16 +83,18 @@ def make_menu(data_cols, dates, data):
         button = dict(
             args=[
                 {
-                    "x": [date_data["x"]],
-                    "y": [date_data["y"]]
+                    "x": [list(date_data["x"])],
+                    "y": [list(date_data["y"])],
                 },
                 {
-                    "updatemenus[1]": col_button_sets[-1]
+                    "updatemenus[1].buttons": col_button_sets[-1],
+                    "updatemenus[1].active": 0
                 }
             ],
             label=date,
             method="update",
         )
+        button["args"][0].update(col_button_sets[-1][0]["args"][0])
         date_buttons.append(button)
 
     menu = [
@@ -106,9 +103,9 @@ def make_menu(data_cols, dates, data):
             direction="down",
             pad={"r": 10, "t": 10},
             showactive=True,
-            x=0.05,
+            x=0.03,
             xanchor="left",
-            y=1.1,
+            y=1.115,
             yanchor="top"
         ),
         dict(
@@ -116,13 +113,21 @@ def make_menu(data_cols, dates, data):
             direction="down",
             pad={"r": 10, "t": 10},
             showactive=True,
-            x=0.32,
+            x=0.205,
             xanchor="left",
-            y=1.1,
+            y=1.115,
             yanchor="top"
         )
     ]
-    return menu
+
+    annotations = [
+        dict(text="Date: ", x=0, xref="paper", y=1.09, yref="paper",
+             align="left", showarrow=False),
+        dict(text="Metric: ", x=0.17, xref="paper", y=1.09, yref="paper",
+             align="left", showarrow=False)
+    ]
+
+    return (menu, annotations)
 
 
 def load_data():
@@ -143,11 +148,12 @@ def load_data():
 
 
 def make_test_data():
-    xy = [1000, 2000, 3000, 4000]
+    x = [1000, 2000, 3000, 4000]
+    y = [100, 200, 300, 400]
     date = ["2020-01-01", "2020-02-02", "2020-03-03", "2020-04-04"]
     var1 = [10, 20, 30, 40]
     var2 = [20, 40, 60, 80]
-    df = pd.DataFrame(data=zip(xy, xy, date, var1, var2),
+    df = pd.DataFrame(data=zip(x, y, date, var1, var2),
                       columns=["x", "y", "date", "var1", "var2"])
 
     return df
