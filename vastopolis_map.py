@@ -1,7 +1,7 @@
 import plotly.graph_objects as go
 from PIL import Image
 
-import numpy as np
+# import numpy as np
 import pandas as pd
 
 XMAX = 5216
@@ -12,16 +12,18 @@ def render_map(data):
     # Create figure
     fig = go.Figure()
 
-    data_cols = data.columns[2:]
+    data_cols = data.columns[3:]
+    dates = data["date"].unique()
+    filtered_data = data[data["date"] == dates[0]]
 
     # Add trace
     fig.add_trace(
         # go.Scatter(x=[0, 0.5, 1, 2, 2.2], y=[1.23, 2.5, 0.42, 3, 1])
         go.Scatter(
-            x=data["x"], y=data["y"],
+            x=filtered_data["x"], y=filtered_data["y"],
             mode='markers', hoverinfo="text",
-            hovertext=data[data_cols[0]],
-            marker_size=data[data_cols[0]],
+            hovertext=filtered_data[data_cols[0]],
+            marker_size=filtered_data[data_cols[0]],
         )
     )
 
@@ -41,49 +43,124 @@ def render_map(data):
             layer="below")
     )
 
-    buttons = []
-    for col in data_cols:
-        button = dict(
-            args=[{"hovertext": [["{}: {}".format(col, str(i)) for i in data[col]]], "marker.size": [
-                data[col]]}],
-            label=col,
-            method="restyle",
-        )
-        buttons.append(button)
+    menu = make_menu(data_cols, dates, data)
 
     # Set templates
     fig.update_layout(template="plotly_white")
     fig.update_xaxes(showgrid=False, range=[0, XMAX], showticklabels=False)
     fig.update_yaxes(showgrid=False, range=[0, YMAX], showticklabels=False)
     fig.update_layout(
-        updatemenus=[
-            dict(
-                buttons=buttons,
-                direction="down",
-                pad={"r": 10, "t": 10},
-                showactive=True,
-                x=0.05,
-                xanchor="left",
-                y=1.1,
-                yanchor="top"
-            ),
-        ]
+        updatemenus=menu
     )
 
     fig.update_layout(
         annotations=[
-            dict(text="Metric: ", x=0, xref="paper", y=1.07, yref="paper",
-                 align="left", showarrow=False)]
+            dict(text="Date: ", x=0, xref="paper", y=1.07, yref="paper",
+                 align="left", showarrow=False),
+            dict(text="Metric: ", x=0.27, xref="paper", y=1.07, yref="paper",
+                      align="left", showarrow=False)
+        ]
     )
     fig.show()
 
 
-if __name__ == "__main__":
-    x = np.random.randint(0, XMAX, (10))
-    y = np.random.randint(0, YMAX, (10))
-    var1 = np.random.randint(50, 100, (10))
-    var2 = np.random.randint(50, 100, (10))
-    data = pd.DataFrame(data=zip(x, y, var1, var2),
-                        columns=["x", "y", "var1", "var2"])
+def make_menu(data_cols, dates, data):
+    date_buttons = []
+    col_button_sets = []
 
-    render_map(data)
+    for date in dates:
+        date_data = data[data["date"] == dates[0]]
+        column_buttons = []
+        for col in data_cols:
+            button = dict(
+                args=[
+                    {
+                        "hovertext": [["{}: {}".format(col, str(i)) for i in
+                                       date_data[col]]],
+                        "marker.size": [date_data[col]]
+                    }
+                ],
+                label=col,
+                method="restyle",
+            )
+            column_buttons.append(button)
+        col_button_sets.append(column_buttons)
+        button = dict(
+            args=[
+                {
+                    "x": [date_data["x"]],
+                    "y": [date_data["y"]]
+                },
+                {
+                    "updatemenus[1]": col_button_sets[-1]
+                }
+            ],
+            label=date,
+            method="update",
+        )
+        date_buttons.append(button)
+
+    menu = [
+        dict(
+            buttons=date_buttons,
+            direction="down",
+            pad={"r": 10, "t": 10},
+            showactive=True,
+            x=0.05,
+            xanchor="left",
+            y=1.1,
+            yanchor="top"
+        ),
+        dict(
+            buttons=col_button_sets[0],
+            direction="down",
+            pad={"r": 10, "t": 10},
+            showactive=True,
+            x=0.32,
+            xanchor="left",
+            y=1.1,
+            yanchor="top"
+        )
+    ]
+    return menu
+
+
+def load_data():
+    raw_data = pd.read_csv("./a3_data/disease_posts.csv")
+    def x(x): return XMAX*(float(x["Location"].split(" ")[0]) - 42.1609)/0.1408
+
+    def y(x): return YMAX - \
+        (YMAX*(float(x["Location"].split(" ")[1]) - 93.1923)/.375)
+
+    raw_data["x"] = raw_data.apply(x, axis=1)
+    raw_data["y"] = raw_data.apply(y, axis=1)
+    raw_data["dummy"] = 1
+
+    data = raw_data[["x", "y", "date", "dummy"]]
+    data = data.sort_values(by="date")
+
+    return data
+
+
+def make_test_data():
+    xy = [1000, 2000, 3000, 4000]
+    date = ["2020-01-01", "2020-02-02", "2020-03-03", "2020-04-04"]
+    var1 = [10, 20, 30, 40]
+    var2 = [20, 40, 60, 80]
+    df = pd.DataFrame(data=zip(xy, xy, date, var1, var2),
+                      columns=["x", "y", "date", "var1", "var2"])
+
+    return df
+
+
+if __name__ == "__main__":
+    # x = np.random.randint(0, XMAX, (10))
+    # y = np.random.randint(0, YMAX, (10))
+    # var1 = np.random.randint(50, 100, (10))
+    # var2 = np.random.randint(50, 100, (10))
+    # data = pd.DataFrame(data=zip(x, y, var1, var2),
+    #                     columns=["x", "y", "var1", "var2"])
+    # data=load_data()
+
+    # render_map(data)
+    render_map(make_test_data())
