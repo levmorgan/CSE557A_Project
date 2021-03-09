@@ -56,6 +56,7 @@ def render_map(data):
     fig.update_layout(
         annotations=annotations
     )
+    fig.write_html("index.html")
     fig.show()
 
 
