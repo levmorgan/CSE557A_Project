@@ -1,8 +1,8 @@
 import plotly.graph_objects as go
 from PIL import Image
 
-# import numpy as np
 import pandas as pd
+
 
 XMAX = 5216
 YMAX = 2653
@@ -19,13 +19,53 @@ def render_map(data):
     # Add trace
     fig.add_trace(
         # go.Scatter(x=[0, 0.5, 1, 2, 2.2], y=[1.23, 2.5, 0.42, 3, 1])
-        go.Scatter(
+        # go.Scatter(
+        #     x=filtered_data["x"], y=filtered_data["y"],
+        #     mode='markers', hoverinfo="text",
+        #     hovertext=filtered_data[data_cols[0]],
+        #     marker_size=filtered_data[data_cols[0]],
+        # )
+        go.Histogram2dContour(
             x=filtered_data["x"], y=filtered_data["y"],
-            mode='markers', hoverinfo="text",
-            hovertext=filtered_data[data_cols[0]],
-            marker_size=filtered_data[data_cols[0]],
+            z=filtered_data[data_cols[0]],
+            # hovertemplate="%{z}",
+            hoverinfo="z",
+            opacity=0.7,
+            colorscale='Jet',
+            histfunc='sum',
+            xbins=dict(size=32),
+            ybins=dict(size=32),
+            line=dict(width=0)
+            # contours=dict(
+            #     showlabels=True,
+            #     labelfont=dict(
+            #         family='Raleway',
+            #         color='white'
+            #     )
+            # )
         )
     )
+
+    # Add opacity slider
+    steps = []
+    for i in [i/10. for i in range(0, 11, 1)]:
+        step = dict(
+            args=[
+                {
+                    "opacity": i
+                }
+            ],
+            method="restyle",
+            label="{:.1f}".format(i),
+        )
+        steps.append(step)
+
+    sliders = [dict(
+        active=7,
+        currentvalue={"prefix": "Opacity: "},
+        pad={"t": 50},
+        steps=steps
+    )]
 
     # Add images
     img = Image.open('./a3_data/Vastopolis_Map.png')
@@ -50,12 +90,11 @@ def render_map(data):
     fig.update_xaxes(showgrid=False, range=[0, XMAX], showticklabels=False)
     fig.update_yaxes(showgrid=False, range=[0, YMAX], showticklabels=False)
     fig.update_layout(
-        updatemenus=menu
-    )
-
-    fig.update_layout(
+        updatemenus=menu,
+        sliders=sliders,
         annotations=annotations
     )
+
     fig.write_html("index.html")
     fig.show()
 
@@ -70,14 +109,18 @@ def make_menu(data_cols, dates, data):
         for col in data_cols:
             button = dict(
                 args=[
+                    # {
+                    #     "hovertext": [["{}: {}".format(col, str(i)) for i in
+                    #                    date_data[col]]],
+                    #     "marker.size": [date_data[col]]
+                    # }
                     {
-                        "hovertext": [["{}: {}".format(col, str(i)) for i in
-                                       date_data[col]]],
-                        "marker.size": [date_data[col]]
-                    }
+                        "z": [list(date_data[col])],
+                    },
+                    {}
                 ],
                 label=col,
-                method="restyle",
+                method="update",
             )
             column_buttons.append(button)
         col_button_sets.append(column_buttons)
@@ -132,19 +175,16 @@ def make_menu(data_cols, dates, data):
 
 
 def load_data():
-    raw_data = pd.read_csv("./a3_data/disease_posts.csv")
-    def x(x): return XMAX*(float(x["Location"].split(" ")[0]) - 42.1609)/0.1408
+    raw_data = pd.read_csv("./a3_data/data.csv")
+    data = raw_data[["x", "y", "date"]].copy()
+    data["cases"] = 1
 
-    def y(x): return YMAX - \
-        (YMAX*(float(x["Location"].split(" ")[1]) - 93.1923)/.375)
-
-    raw_data["x"] = raw_data.apply(x, axis=1)
-    raw_data["y"] = raw_data.apply(y, axis=1)
-    raw_data["dummy"] = 1
-
-    data = raw_data[["x", "y", "date", "dummy"]]
-    data = data.sort_values(by="date")
-
+    pop = pd.read_csv("./a3_data/population.csv")
+    pop = pop.set_index("Zone_Name")
+    data["cases per 1000 people"] = raw_data.apply(
+        lambda row: ((1000./float(pop["Daytime_Population"].loc[row["region"]]))
+                     if row["region"] != 'UNDEFINED' else 0),
+        axis=1)
     return data
 
 
