@@ -1,3 +1,4 @@
+from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 from PIL import Image
 
@@ -10,15 +11,34 @@ YMAX = 2653
 
 def render_map(data):
     # Create figure
-    fig = go.Figure()
+    fig = make_subplots(rows=2, cols=1, row_heights=[0.1, 0.9],
+                        vertical_spacing=0.09)
 
     data_cols = data.columns[3:]
     dates = data["date"].unique()
     filtered_data = data[data["date"] == dates[0]]
 
-    # Add trace
+    # Add timeseries
+    ts = pd.read_csv("a3_data/dates.csv")
+    
     fig.add_trace(
-        # go.Scatter(x=[0, 0.5, 1, 2, 2.2], y=[1.23, 2.5, 0.42, 3, 1])
+        go.Scatter(
+            type="scatter",
+            mode="lines",
+            name='Disease Posts Per Day',
+            x=ts["Date"],
+            y=ts["0"],
+            line={"color": '#17BECF'}
+
+        ),
+        row=1, col=1
+    )
+
+    # Load weather data
+    weather = pd.read_csv("./a3_data/Weather.csv")
+
+    # Add heatmap
+    fig.add_trace(
         # go.Scatter(
         #     x=filtered_data["x"], y=filtered_data["y"],
         #     mode='markers', hoverinfo="text",
@@ -36,25 +56,17 @@ def render_map(data):
             xbins=dict(size=32),
             ybins=dict(size=32),
             line=dict(width=0)
-            # contours=dict(
-            #     showlabels=True,
-            #     labelfont=dict(
-            #         family='Raleway',
-            #         color='white'
-            #     )
-            # )
-        )
+        ),
+        row=2, col=1,
     )
 
     # Add opacity slider
     steps = []
     for i in [i/10. for i in range(0, 11, 1)]:
         step = dict(
-            args=[
-                {
-                    "opacity": i
-                }
-            ],
+            args=[dict(
+                opacity=[[], i]
+            )],
             method="restyle",
             label="{:.1f}".format(i),
         )
@@ -80,15 +92,19 @@ def render_map(data):
             sizey=YMAX,
             sizing="stretch",
             opacity=1,
-            layer="below")
+            layer="below",
+        ),
+        row=2, col=1
     )
 
-    menu, annotations = make_menu(data_cols, dates, data)
+    menu, annotations = make_menu(data_cols, dates, data, ts, weather)
 
     # Set templates
     fig.update_layout(template="plotly_white")
-    fig.update_xaxes(showgrid=False, range=[0, XMAX], showticklabels=False)
-    fig.update_yaxes(showgrid=False, range=[0, YMAX], showticklabels=False)
+    fig.update_xaxes(showgrid=False, range=[
+                     0, XMAX], showticklabels=False, row=2, col=1)
+    fig.update_yaxes(showgrid=False, range=[
+                     0, YMAX], showticklabels=False, row=2, col=1)
     fig.update_layout(
         updatemenus=menu,
         sliders=sliders,
@@ -99,11 +115,12 @@ def render_map(data):
     fig.show()
 
 
-def make_menu(data_cols, dates, data):
+def make_menu(data_cols, dates, data, ts, weather):
     date_buttons = []
     col_button_sets = []
 
-    for date in dates:
+    for i in range(len(dates)):
+        date = dates[i]
         date_data = data[data["date"] == date]
         column_buttons = []
         for col in data_cols:
@@ -115,9 +132,8 @@ def make_menu(data_cols, dates, data):
                     #     "marker.size": [date_data[col]]
                     # }
                     {
-                        "z": [list(date_data[col])],
-                    },
-                    {}
+                        "z": [None, list(date_data[col])],
+                    }
                 ],
                 label=col,
                 method="update",
@@ -127,12 +143,16 @@ def make_menu(data_cols, dates, data):
         button = dict(
             args=[
                 {
-                    "x": [list(date_data["x"])],
-                    "y": [list(date_data["y"])],
+                    "x": [list(ts["Date"]), list(date_data["x"])],
+                    "y": [list(ts["0"]), list(date_data["y"])],
                 },
                 {
                     "updatemenus[1].buttons": col_button_sets[-1],
-                    "updatemenus[1].active": 0
+                    "updatemenus[1].active": 0,
+                    "annotations[2].text": "Wind: {}, {}".format(
+                        weather["Average_Wind_Speed"].iloc[i],
+                        weather["Wind_Direction"].iloc[i])
+
                 }
             ],
             label=date,
@@ -157,7 +177,7 @@ def make_menu(data_cols, dates, data):
             direction="down",
             pad={"r": 10, "t": 10},
             showactive=True,
-            x=0.205,
+            x=0.285,
             xanchor="left",
             y=1.115,
             yanchor="top"
@@ -167,8 +187,13 @@ def make_menu(data_cols, dates, data):
     annotations = [
         dict(text="Date: ", x=0, xref="paper", y=1.09, yref="paper",
              align="left", showarrow=False),
-        dict(text="Metric: ", x=0.17, xref="paper", y=1.09, yref="paper",
-             align="left", showarrow=False)
+        dict(text="Metric: ", x=0.25, xref="paper", y=1.09, yref="paper",
+             align="left", showarrow=False),
+        dict(text="Wind: {}, {}".format(
+            weather["Average_Wind_Speed"].iloc[0],
+            weather["Wind_Direction"].iloc[0]),
+            x=0.5, xref="paper", y=1.09, yref="paper",
+            align="left", showarrow=False)
     ]
 
     return (menu, annotations)
@@ -181,8 +206,8 @@ def load_data():
 
     pop = pd.read_csv("./a3_data/population.csv")
     pop = pop.set_index("Zone_Name")
-    data["cases per 1000 people"] = raw_data.apply(
-        lambda row: ((1000./float(pop["Daytime_Population"].loc[row["region"]]))
+    data["cases per 100000 people"] = raw_data.apply(
+        lambda row: ((100000./float(pop["Daytime_Population"].loc[row["region"]]))
                      if row["region"] != 'UNDEFINED' else 0),
         axis=1)
     return data

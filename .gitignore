@@ -9,3 +9,5 @@ a3_data/README.docx
 a3_data/Weather.csv
 .vscode/
 .ipynb_checkpoints/Prototyping-checkpoint.ipynb
+timeseries.html
+timeseries.js
